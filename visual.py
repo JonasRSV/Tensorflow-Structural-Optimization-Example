@@ -2,10 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-weights = np.load("weights.npy")
-constraint = np.load("constraints.npy")
-design = np.load("design.npy")
-all_constraint = np.load("all_constraints.npy")
 
 
 def reshape_design_vector(d: np.ndarray, width: np.ndarray, tiny_width: np.ndarray):
@@ -44,6 +40,9 @@ def _make_structure_animation(data, width, tiny_width):
 
 
 def animate(problem_size: int, mode: str):
+    design = np.load("design.npy")
+    all_constraint = np.load("all_constraints.npy")
+
     width = problem_size * 5
     tiny_width = problem_size * 2
 
