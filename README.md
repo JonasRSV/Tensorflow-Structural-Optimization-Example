@@ -21,4 +21,4 @@ pip3 install -r requirements.txt
 jupyter notebook
 ```
 
-Navigate to notebook to test examples.
+Navigate to notebook to test examples, see notebook [here](https://github.com/JonasRSV/Tensorflow-Structural-Optimization-Example/blob/master/demo-stress-conditions.ipynb)
