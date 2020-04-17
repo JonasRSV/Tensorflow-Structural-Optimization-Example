@@ -35,18 +35,29 @@ def _make_structure_animation(data, width, tiny_width):
         images.append([im])
 
     ani = animation.ArtistAnimation(fig, images, interval=50, blit=True,
-                                    repeat_delay=1000)
+                                    repeat_delay=10000)
 
     ani.save("design_animation.mp4")
 
-    plt.show()
+    #plt.show()
+    return ani #plt.show()
+
+
+def animate(problem_size: int, mode: str):
+    width = problem_size * 5
+    tiny_width = problem_size * 2
+
+    animations = {
+        "design": lambda: _make_structure_animation(design, width, tiny_width),
+        "stress": lambda: _make_structure_animation(all_constraint, width, tiny_width),
+    }
+
+    return animations[mode]()
 
 
 if __name__ == "__main__":
-    super_constant = 15
+    problem_size = 5
+    animate(problem_size, mode="design")
 
-    width = super_constant * 5
-    tiny_width = super_constant * 2
 
-    _make_structure_animation(all_constraint, width, tiny_width)
 

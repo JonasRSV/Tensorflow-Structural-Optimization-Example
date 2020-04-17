@@ -5,53 +5,30 @@ from environment_setup import initialize_env
 from von_mises import VonMises
 from circle import Circle
 from fem import FEM
-
-@tf.function
-def weight(design: tf.Tensor):
-    return tf.reduce_sum(design)
-
-
-@tf.function
-def objective(design: tf.Variable,
-              max_stress: tf.Tensor,
-              smoothing_matrix: tf.Tensor,
-              fem_function: tf.function,
-              stress_function: tf.function,
-              barrier_size: tf.Tensor):
-    design = tf.sigmoid(design)
-
-    # design = tf.linalg.matvec(smoothing_matrix, design)
-
-    w = weight(design)
-    u = fem_function(design)
-    s = stress_function(u)
-
-    w_obj = w
-    c_obj = barrier_size * tf.reduce_mean(tf.abs(tf.math.log(tf.maximum((max_stress - s) / barrier_size, 0.00000001))))
-
-    return w_obj + c_obj, w, tf.reduce_max(s), s
+from barrier_objective import Barrier
+import sys
 
 
 def train_op(design: tf.Variable,
              smoothing_matrix: tf.Tensor,
              fem_function: tf.function,
              stress_function: tf.function,
-             optimizer: tf.keras.optimizers.Optimizer,
-             barrier_size: float = 100):
-    barrier_size = tf.constant(barrier_size, dtype=tf.float64)
-
+             objective_function: tf.function,
+             optimizer: tf.keras.optimizers.Optimizer):
     with tf.GradientTape() as tape:
-        obj, w, c, all_c = objective(design,
-                                     max_stress=3000,
-                                     smoothing_matrix=smoothing_matrix,
-                                     fem_function=fem_function,
-                                     stress_function=stress_function,
-                                     barrier_size=barrier_size)
+        sgm_design = tf.sigmoid(design)
+        # design = tf.linalg.matvec(smoothing_matrix, design)
+        weight = tf.reduce_sum(sgm_design)
+        U = fem_function(sgm_design)
+        stress = stress_function(U)
+        objective = objective_function(weight, stress)
 
-    gradients = tape.gradient(obj, design)
+        max_stress = tf.reduce_max(stress)
+
+    gradients = tape.gradient(objective, design)
     optimizer.apply_gradients([(gradients, design)])
 
-    return obj, w, c, all_c
+    return objective, weight, max_stress, stress
 
 
 def main(problem_size: int,
@@ -65,6 +42,10 @@ def main(problem_size: int,
          radius: float = 1.0,
          initial_value_design: float = 2.0,
          elasticity_module: float = 1000,
+         barrier_size: float = 100,
+         barrier_width: float = 100,
+         epochs: int = 100,
+         learning_rate: float=0.1,
          **kwargs):
     design_variables, smoothing_matrix, index_matrix, index_vector, \
     F, stretch_freedom, element_stiffness, freedom_indexes, k_dim = \
@@ -82,7 +63,8 @@ def main(problem_size: int,
         "circle": Circle
     }
     if mode not in modes:
-        print(f"Mode must be one of {' '.join(modes.keys())}")
+        print(f"Mode must be one of ({' | '.join(modes.keys())})")
+        sys.exit(0)
 
     stress_function = modes[mode](elasticity_module=elasticity_module,
                                   index_matrix=index_matrix, stretch_freedom=stretch_freedom,
@@ -97,28 +79,33 @@ def main(problem_size: int,
         elasticity_module=elasticity_module
     ).get_fem_function()
 
-    optimizer = tf.keras.optimizers.Adam(learning_rate=0.1)
-    barrier_size = 1000
+    objective_function = Barrier(
+        max_constraint=max_constraint,
+        barrier_width=barrier_width,
+        barrier_size=barrier_size).get_objective_function()
 
+    optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+
+    opt_timestamp = time.time()
     constraints, weights, designs, all_constraints = [], [], [design_variables.numpy()], []
-    for e in range(100):
+    for e in range(epochs):
         timestamp = time.time()
-        obj, w, c, all_c = train_op(design_variables,
-                                    smoothing_matrix=smoothing_matrix,
-                                    fem_function=fem_function,
-                                    stress_function=stress_function,
-                                    optimizer=optimizer,
-                                    barrier_size=barrier_size)
+        objective, weight, constraint, all_constraint = train_op(
+            design_variables,
+            smoothing_matrix=smoothing_matrix,
+            fem_function=fem_function,
+            stress_function=stress_function,
+            objective_function=objective_function,
+            optimizer=optimizer,
+        )
 
-        # if e % 20 == 0:
-        #    barrier_size = np.maximum(barrier_size - barrier_size * 0.5, 1)
-
-        all_constraints.append(all_c)
-        constraints.append(c)
-        weights.append(w)
+        all_constraints.append(all_constraint)
+        constraints.append(constraint)
+        weights.append(weight)
         designs.append(tf.sigmoid(design_variables).numpy())
 
-        print(f"{e}: objective: {obj} weight: {w} max constraint: {c} -- {time.time() - timestamp}")
+        print(f"{e}: O: {objective} W: {weight} C {constraint} -- T: {time.time() - timestamp}")
+    print(f"Time to run optimization {epochs} epochs: {time.time() - opt_timestamp} seconds")
 
     constraints, weights, designs, all_constraints = np.array(constraints), np.array(weights), \
                                                      np.array(designs), np.array(all_constraints)
@@ -129,8 +116,8 @@ def main(problem_size: int,
     np.save("design", designs)
 
 
-if __name__ == "__main__":
-    problem_size = 3
+def _von_mises():
+    problem_size = 5
     main(
         problem_size=problem_size,
         elements=np.array([
@@ -143,5 +130,33 @@ if __name__ == "__main__":
             -1
         ]),
         max_constraint=3000,
-        mode="von mises"
+        mode="von mises",
+        barrier_size=100,
+        barrier_width=300,
     )
+
+
+def _circle():
+    problem_size = 8
+    main(
+        problem_size=problem_size,
+        elements=np.array([
+            16 * np.square(problem_size) - problem_size * 2
+        ]),
+        directions=np.array([
+            1
+        ]),
+        amplitudes=np.array([
+            -1
+        ]),
+        max_constraint=3000,
+        mode="circle",
+        barrier_size=100,
+        barrier_width=200,
+        phis=[0.0],
+        kf=0.3
+    )
+
+
+if __name__ == "__main__":
+    _von_mises()

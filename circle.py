@@ -64,8 +64,8 @@ class Circle:
         self.elasticity_module = elasticity_module
         self.index_matrix = index_matrix
         self.stretch_freedom = stretch_freedom
-        self.phis = phis
-        self.kf = kf
+        self.phis = tf.constant(phis, dtype=tf.float64)
+        self.kf = tf.constant(kf, dtype=tf.float64)
 
     def get_stress_function(self):
 
@@ -74,10 +74,13 @@ class Circle:
             n_forces = tf.shape(u)[1]
             n_design = self.index_matrix.shape[0]
 
-            index_matrix = tf.reshape(self.index_matrix, [n_forces, n_design, 8])
-            strain_vector = tf.matmul(index_matrix, self.stretch_freedom) * self.elasticity_module
-            strain_vector = tf.reshape(strain_vector, [n_design, 3, n_forces])
-            stress = get_stress(strain_vector, self.phis, self.kf)
+            offsets = tf.gather(params=u, indices=self.index_matrix)
+            offsets = tf.reshape(offsets, [n_forces, n_design, 8])
+
+            stress_vector = tf.matmul(offsets, self.stretch_freedom) * self.elasticity_module
+            stress_vector = tf.reshape(stress_vector, [n_design, 3, n_forces])
+
+            stress = get_stress(stress_vector, self.phis, self.kf)
 
             return stress
 
