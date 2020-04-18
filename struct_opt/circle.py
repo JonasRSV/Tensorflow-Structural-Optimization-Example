@@ -42,13 +42,13 @@ def get_stress(strain_vector: tf.Tensor, phis: tf.Tensor, kf: tf.Tensor):
     b = strain_vector[:, 1]
     c = strain_vector[:, 2]
 
-    t = tf.constant(np.linspace(0, 2 * np.pi, 100))
+    t = tf.constant(np.linspace(0, 2 * np.pi, 100), dtype=tf.float32)
 
     time_x = time_solutions(a, t, phis)
     time_y = time_solutions(b, t, phis)
     time_xy = time_solutions(c, t, phis)
 
-    theta = tf.constant(np.linspace(0, np.pi, 100))
+    theta = tf.constant(np.linspace(0, np.pi, 100), dtype=tf.float32)
     sigma_solution, tau_solution = angle_solutions(time_x, time_y, time_xy, theta)
 
     return design_variable_constraint(sigma=sigma_solution, tau=tau_solution, kf=kf)
