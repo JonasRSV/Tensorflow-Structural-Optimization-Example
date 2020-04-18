@@ -39,7 +39,7 @@ class GaussianSmoothing:
 
         self.smoothing_matrix = (smoothing_matrix.T / smoothing_matrix.sum(axis=1)).T
 
-        self.smoothing_matrix = tf.constant(self.smoothing_matrix, dtype=tf.float64)
+        self.smoothing_matrix = tf.constant(self.smoothing_matrix, dtype=tf.float32)
 
     def _gaussian_kernel(self, x, y):
         return np.exp(-np.square(x - y).sum() / self.variance)

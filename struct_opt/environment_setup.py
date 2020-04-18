@@ -148,7 +148,7 @@ def initialize_env(problem_size: int,
     n_design = np.square(problem_size) * 16
 
     """Vector to optimise"""
-    design_variables = tf.Variable(np.ones(n_design) * initial_values_design, trainable=True)
+    design_variables = tf.Variable(np.ones(n_design) * initial_values_design, trainable=True, dtype=tf.float32)
 
     """Smoothing matrix for the design variables"""
     smoothing_matrix = make_smoothing(n_design)

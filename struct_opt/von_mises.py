@@ -8,9 +8,9 @@ class VonMises:
                  node_index_matrix: np.ndarray,
                  stretch_freedom: np.ndarray,
                  **kwargs):
-        self.elasticity_module = tf.constant(elasticity_module, dtype=tf.float64)
+        self.elasticity_module = tf.constant(elasticity_module, dtype=tf.float32)
         self.node_index_matrix = tf.constant(node_index_matrix)
-        self.stretch_freedom = tf.constant(stretch_freedom, dtype=tf.float64)
+        self.stretch_freedom = tf.constant(stretch_freedom, dtype=tf.float32)
 
     def get_stress_function(self):
 

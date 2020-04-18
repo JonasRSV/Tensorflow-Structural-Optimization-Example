@@ -14,7 +14,7 @@ class NoPenalty:
 class EntropyPenalty:
 
     def __init__(self, penalty_size: float, **kwargs):
-        self.penalty_size = tf.constant(penalty_size, dtype=tf.float64)
+        self.penalty_size = tf.constant(penalty_size, dtype=tf.float32)
 
     def get_penalty_function(self):
         @tf.function

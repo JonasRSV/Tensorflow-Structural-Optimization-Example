@@ -63,11 +63,11 @@ class Circle:
                  kf: tf.Tensor,
                  **kwargs):
 
-        self.elasticity_module = tf.constant(elasticity_module, dtype=tf.float64)
-        self.node_index_matrix = tf.constant(node_index_matrix)
-        self.stretch_freedom = tf.constant(stretch_freedom)
-        self.phis = tf.constant(phis, dtype=tf.float64)
-        self.kf = tf.constant(kf, dtype=tf.float64)
+        self.elasticity_module = tf.constant(elasticity_module, dtype=tf.float32)
+        self.node_index_matrix = tf.constant(node_index_matrix, dtype=tf.int32)
+        self.stretch_freedom = tf.constant(stretch_freedom, dtype=tf.float32)
+        self.phis = tf.constant(phis, dtype=tf.float32)
+        self.kf = tf.constant(kf, dtype=tf.float32)
 
     def get_stress_function(self):
 

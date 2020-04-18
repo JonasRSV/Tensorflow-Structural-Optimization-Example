@@ -10,12 +10,12 @@ class FEM:
                  freedom_indexes: np.ndarray,
                  k_dim: np.ndarray,
                  elasticity_module: float):
-        self.node_index_vector = tf.constant(node_index_vector)
-        self.F = tf.constant(F)
-        self.element_stiffness = tf.constant(element_stiffness)
-        self.freedom_indexes = tf.constant(freedom_indexes)
+        self.node_index_vector = tf.constant(node_index_vector, dtype=tf.int64)
+        self.F = tf.constant(F, dtype=tf.float32)
+        self.element_stiffness = tf.constant(element_stiffness, dtype=tf.float32)
+        self.freedom_indexes = tf.constant(freedom_indexes, dtype=tf.int32)
         self.k_dim = tf.constant(k_dim, dtype=tf.int64)
-        self.elasticity_module = tf.constant(elasticity_module, dtype=tf.float64)
+        self.elasticity_module = tf.constant(elasticity_module, dtype=tf.float32)
 
     def get_fem_function(self):
 
