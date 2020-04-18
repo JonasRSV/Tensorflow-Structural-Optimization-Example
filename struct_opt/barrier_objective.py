@@ -4,9 +4,9 @@ import tensorflow as tf
 class Barrier():
 
     def __init__(self, max_constraint: float, barrier_width: float, barrier_size: float):
-        self.max_constraint = max_constraint
-        self.barrier_width = barrier_width
-        self.barrier_size = barrier_size
+        self.max_constraint = tf.constant(max_constraint, dtype=tf.float64)
+        self.barrier_width = tf.constant(barrier_width, dtype=tf.float64)
+        self.barrier_size = tf.constant(barrier_size, dtype=tf.float64)
 
     def get_objective_function(self):
         @tf.function

@@ -2,13 +2,14 @@ import tensorflow as tf
 import numpy as np
 import time
 
+
 def make_smoothing(n_design: int):
-    return tf.constant(np.random.rand(n_design, n_design) / n_design)
+    return np.random.rand(n_design, n_design) / n_design
 
 
 def make_F(bracket: int,
            tiny_bracket: int,
-           index_matrix: np.ndarray,
+           node_index_matrix: np.ndarray,
            elements: np.ndarray,
            directions: np.ndarray,
            amplitudes: np.ndarray):
@@ -16,7 +17,7 @@ def make_F(bracket: int,
 
     F = np.zeros((force_size, amplitudes.size))
     for i in range(elements.size):
-        row = index_matrix[elements[i]]
+        row = node_index_matrix[elements[i]]
 
         if directions[i] == 0:
             positions = row[0::2]
@@ -26,12 +27,12 @@ def make_F(bracket: int,
         for position in positions:
             F[position, i] = amplitudes[i] / len(positions)
 
-    return tf.constant(F)
+    return F
 
 
-def get_index_vector(index_matrix: np.ndarray):
-    column_index_for_K = np.kron(index_matrix.T, np.ones(8)).astype(np.int).T.reshape(-1, 1)
-    row_index_for_K = np.kron(index_matrix, np.ones(8)).astype(np.int).reshape(-1, 1)
+def get_index_vector(node_index_matrix: np.ndarray):
+    column_index_for_K = np.kron(node_index_matrix.T, np.ones(8)).astype(np.int).T.reshape(-1, 1)
+    row_index_for_K = np.kron(node_index_matrix, np.ones(8)).astype(np.int).reshape(-1, 1)
 
     index_vector = np.concatenate([column_index_for_K, row_index_for_K], axis=1)
 
@@ -67,7 +68,7 @@ def setup_strain_problem(bracket_heigth: int,
 
     stretch_freedom = freedom_matrix @ stretch_matrix
 
-    def make_index_matrix(heigth: int, width: int):
+    def make_node_index_matrix(heigth: int, width: int):
         n_nodes_heigth = heigth + 1
         n_nodes_width = width + 1
 
@@ -89,15 +90,13 @@ def setup_strain_problem(bracket_heigth: int,
     remaining_height = tiny_bracket_width
     remaining_width = remaining_elements
 
-    index_matrix_top = make_index_matrix(bracket_heigth, tiny_bracket_width)
-    index_matrix_bottom = make_index_matrix(remaining_height, remaining_width)
+    node_index_matrix_top = make_node_index_matrix(bracket_heigth, tiny_bracket_width)
+    node_index_matrix_bottom = make_node_index_matrix(remaining_height, remaining_width)
 
-    index_matrix_bottom = index_matrix_bottom + 2 * (tiny_bracket_width + 1) * bracket_heigth
-    index_matrix = np.concatenate([index_matrix_top, index_matrix_bottom], axis=0)
+    node_index_matrix_bottom = node_index_matrix_bottom + 2 * (tiny_bracket_width + 1) * bracket_heigth
+    node_index_matrix = np.concatenate([node_index_matrix_top, node_index_matrix_bottom], axis=0)
 
-    return index_matrix - 1, \
-           tf.constant(stretch_freedom.T), \
-           tf.constant(element_stiffness)
+    return node_index_matrix - 1, stretch_freedom.T, element_stiffness
 
 
 def make_fixed_degrees_of_freedom(bracket: int, tiny_bracket: int, k_dim: int):
@@ -114,10 +113,29 @@ def make_fixed_degrees_of_freedom(bracket: int, tiny_bracket: int, k_dim: int):
     return freedom_indexes
 
 
+def get_element_index_matrix(problem_size: int):
+    bracket = problem_size * 5
+    tiny_bracket = problem_size * 2
+
+    element_index_matrix = np.ones((bracket, bracket), dtype=np.int) * -1
+
+    index = 0
+    for i in range(tiny_bracket):
+        for j in range(bracket):
+            element_index_matrix[j, i] = index
+            index += 1
+
+    for i in range(tiny_bracket, bracket):
+        for j in range(bracket - tiny_bracket, bracket):
+            element_index_matrix[j, i] = index
+            index += 1
+
+    return element_index_matrix
+
+
 def initialize_env(problem_size: int,
                    thickness: float,
                    poisson_ratio: float,
-                   radius: float,
                    elements: np.ndarray,
                    directions: np.ndarray,
                    amplitudes: np.ndarray,
@@ -136,7 +154,7 @@ def initialize_env(problem_size: int,
     smoothing_matrix = make_smoothing(n_design)
 
     """Constant matrices for pre and post processing in the solver"""
-    index_matrix, stretch_freedom, element_stiffness = setup_strain_problem(
+    node_index_matrix, stretch_freedom, element_stiffness = setup_strain_problem(
         bracket_heigth=bracket,
         tiny_bracket_width=tiny_bracket,
         element_length=element_length,
@@ -145,18 +163,18 @@ def initialize_env(problem_size: int,
     )
 
     """Vector for constructing K matrix"""
-    index_vector = get_index_vector(index_matrix=index_matrix)
+    node_index_vector = get_index_vector(node_index_matrix=node_index_matrix)
 
     """Force vector for FEM"""
     F = make_F(bracket=bracket,
                tiny_bracket=tiny_bracket,
-               index_matrix=index_matrix,
+               node_index_matrix=node_index_matrix,
                elements=elements,
                directions=directions,
                amplitudes=amplitudes)
 
     """Dimension of K matrix"""
-    k_dim = tf.constant(index_matrix.max(), dtype=tf.int64) + 1
+    k_dim = node_index_matrix.max() + 1
 
     """Fixed degrees of freedom mask"""
     freedom_indexes = make_fixed_degrees_of_freedom(bracket=bracket,
@@ -165,6 +183,6 @@ def initialize_env(problem_size: int,
 
     print(f"Initializing env: {time.time() - timestamp} seconds")
 
-    return design_variables, smoothing_matrix, tf.constant(index_matrix), \
-           tf.constant(index_vector), F, stretch_freedom, element_stiffness, \
-           tf.constant(freedom_indexes), k_dim
+    return design_variables, smoothing_matrix, node_index_matrix, \
+           node_index_vector, F, stretch_freedom, element_stiffness, \
+           freedom_indexes, k_dim

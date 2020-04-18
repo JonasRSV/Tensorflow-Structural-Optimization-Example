@@ -1,27 +1,28 @@
 import tensorflow as tf
 import time
 import numpy as np
-from environment_setup import initialize_env
-from von_mises import VonMises
-from circle import Circle
-from fem import FEM
-from barrier_objective import Barrier
+from struct_opt.environment_setup import initialize_env, get_element_index_matrix
+from struct_opt.von_mises import VonMises
+from struct_opt.circle import Circle
+from struct_opt.fem import FEM
+from struct_opt.barrier_objective import Barrier
+from struct_opt.smoothing import NoSmoothing, GaussianSmoothing
 import sys
 
 
 def train_op(design: tf.Variable,
-             smoothing_matrix: tf.Tensor,
+             smoothing_function: tf.function,
              fem_function: tf.function,
              stress_function: tf.function,
              objective_function: tf.function,
              optimizer: tf.keras.optimizers.Optimizer):
     with tf.GradientTape() as tape:
-        sgm_design = tf.sigmoid(design)
-        # design = tf.linalg.matvec(smoothing_matrix, design)
-        weight = tf.reduce_sum(sgm_design)
-        U = fem_function(sgm_design)
-        stress = stress_function(U)
-        objective = objective_function(weight, stress)
+        sgm_design    = tf.sigmoid(design)
+        smooth_design = smoothing_function(sgm_design)
+        weight        = tf.reduce_sum(smooth_design)
+        U             = fem_function(smooth_design)
+        stress        = stress_function(U)
+        objective     = objective_function(weight, stress)
 
         max_stress = tf.reduce_max(stress)
 
@@ -37,22 +38,22 @@ def main(problem_size: int,
          amplitudes: np.ndarray,
          max_constraint: float,
          mode: str,
+         smoothing_mode: str = "none",
          thickness: float = 0.02,
          poisson_ratio: float = 0.3,
-         radius: float = 1.0,
          initial_value_design: float = 2.0,
          elasticity_module: float = 1000,
          barrier_size: float = 100,
          barrier_width: float = 100,
          epochs: int = 100,
          learning_rate: float=0.1,
+         data_directory: str="../data",
          **kwargs):
-    design_variables, smoothing_matrix, index_matrix, index_vector, \
+    design_variables, smoothing_matrix, node_index_matrix, node_index_vector, \
     F, stretch_freedom, element_stiffness, freedom_indexes, k_dim = \
         initialize_env(problem_size=problem_size,
                        thickness=thickness,
                        poisson_ratio=poisson_ratio,
-                       radius=radius,
                        elements=elements,
                        directions=directions,
                        amplitudes=amplitudes,
@@ -67,11 +68,23 @@ def main(problem_size: int,
         sys.exit(0)
 
     stress_function = modes[mode](elasticity_module=elasticity_module,
-                                  index_matrix=index_matrix, stretch_freedom=stretch_freedom,
+                                  node_index_matrix=node_index_matrix, stretch_freedom=stretch_freedom,
                                   **kwargs).get_stress_function()
 
+    smoothing_modes = {
+        "none": NoSmoothing,
+        "gaussian": GaussianSmoothing
+    }
+
+    if smoothing_mode not in smoothing_modes:
+        print(f"Smoothing mode must be one of ({' | '.join(smoothing_modes.keys())})")
+        sys.exit(0)
+
+    element_index_matrix = get_element_index_matrix(problem_size=problem_size)
+    smoothing_function = smoothing_modes[smoothing_mode](element_index_matrix, **kwargs).get_smoothing_function()
+
     fem_function = FEM(
-        index_vector=index_vector,
+        node_index_vector=node_index_vector,
         F=F,
         element_stiffness=element_stiffness,
         freedom_indexes=freedom_indexes,
@@ -92,7 +105,7 @@ def main(problem_size: int,
         timestamp = time.time()
         objective, weight, constraint, all_constraint = train_op(
             design_variables,
-            smoothing_matrix=smoothing_matrix,
+            smoothing_function=smoothing_function,
             fem_function=fem_function,
             stress_function=stress_function,
             objective_function=objective_function,
@@ -110,10 +123,10 @@ def main(problem_size: int,
     constraints, weights, designs, all_constraints = np.array(constraints), np.array(weights), \
                                                      np.array(designs), np.array(all_constraints)
 
-    np.save("all_constraints", all_constraints)
-    np.save("constraints", constraints)
-    np.save("weights", weights)
-    np.save("design", designs)
+    np.save(f"{data_directory}/all_constraints", all_constraints)
+    np.save(f"{data_directory}/constraints", constraints)
+    np.save(f"{data_directory}/weights", weights)
+    np.save(f"{data_directory}/design", designs)
 
 
 def _von_mises():
@@ -131,8 +144,11 @@ def _von_mises():
         ]),
         max_constraint=3000,
         mode="von mises",
+        smoothing_mode="gaussian",
+        smoothing_width=5,
+        variance=3.0,
         barrier_size=100,
-        barrier_width=300,
+        barrier_width=300
     )
 
 

@@ -6,6 +6,7 @@ import numpy as np
 def time_solutions(letter: tf.Tensor, t: tf.Tensor, phi: tf.Tensor):
     broadcast_phi = tf.reshape(phi, [-1, 1])
     broadcasted_sin = tf.sin(t + broadcast_phi) + 1
+
     return tf.matmul(letter, broadcasted_sin)
 
 
@@ -25,7 +26,7 @@ def angle_solutions(time_x: tf.Tensor, time_y: tf.Tensor, time_xy: tf.Tensor, th
     return sigma, tau
 
 
-def design_variable_constraint(sigma: tf.Tensor, tau: tf.Tensor, kf):
+def design_variable_constraint(sigma: tf.Tensor, tau: tf.Tensor, kf: tf.Tensor):
     max_tau = tf.reduce_max(tau, axis=1)
     min_tau = tf.reduce_min(tau, axis=1)
     max_kf = kf * tf.reduce_max(sigma, axis=1)
@@ -56,14 +57,15 @@ def get_stress(strain_vector: tf.Tensor, phis: tf.Tensor, kf: tf.Tensor):
 class Circle:
 
     def __init__(self, elasticity_module: float,
-                 index_matrix: tf.Tensor,
-                 stretch_freedom: tf.Tensor,
+                 node_index_matrix: np.ndarray,
+                 stretch_freedom: np.ndarray,
                  phis: tf.Tensor,
-                 kf: tf.Tensor):
+                 kf: tf.Tensor,
+                 **kwargs):
 
-        self.elasticity_module = elasticity_module
-        self.index_matrix = index_matrix
-        self.stretch_freedom = stretch_freedom
+        self.elasticity_module = tf.constant(elasticity_module, dtype=tf.float64)
+        self.node_index_matrix = tf.constant(node_index_matrix)
+        self.stretch_freedom = tf.constant(stretch_freedom)
         self.phis = tf.constant(phis, dtype=tf.float64)
         self.kf = tf.constant(kf, dtype=tf.float64)
 
@@ -72,9 +74,9 @@ class Circle:
         @tf.function
         def stress_function(u: tf.Tensor):
             n_forces = tf.shape(u)[1]
-            n_design = self.index_matrix.shape[0]
+            n_design = self.node_index_matrix.shape[0]
 
-            offsets = tf.gather(params=u, indices=self.index_matrix)
+            offsets = tf.gather(params=u, indices=self.node_index_matrix)
             offsets = tf.reshape(offsets, [n_forces, n_design, 8])
 
             stress_vector = tf.matmul(offsets, self.stretch_freedom) * self.elasticity_module
