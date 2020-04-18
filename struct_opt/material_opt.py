@@ -138,10 +138,10 @@ def main(problem_size: int,
             penalty=penalty
         )
 
-        all_constraints.append(all_constraint)
-        constraints.append(constraint)
-        weights.append(weight)
-        designs.append(smooth_design)
+        all_constraints.append(all_constraint.numpy())
+        constraints.append(constraint.numpy())
+        weights.append(weight.numpy())
+        designs.append(smooth_design.numpy())
 
         print(f"{e}: O: {objective} W: {weight} C {constraint} -- T: {time.time() - timestamp}")
     print(f"Time to run optimization {epochs} epochs: {time.time() - opt_timestamp} seconds")
