@@ -7,6 +7,7 @@ from struct_opt.circle import Circle
 from struct_opt.fem import FEM
 from struct_opt.barrier_objective import Barrier
 from struct_opt.smoothing import NoSmoothing, GaussianSmoothing
+from struct_opt.penalty import NoPenalty, EntropyPenalty
 import sys
 
 
@@ -15,7 +16,9 @@ def train_op(design: tf.Variable,
              fem_function: tf.function,
              stress_function: tf.function,
              objective_function: tf.function,
-             optimizer: tf.keras.optimizers.Optimizer):
+             penalty_function: tf.function,
+             optimizer: tf.keras.optimizers.Optimizer,
+             penalty: bool):
     with tf.GradientTape() as tape:
         sgm_design    = tf.sigmoid(design)
         smooth_design = smoothing_function(sgm_design)
@@ -23,6 +26,9 @@ def train_op(design: tf.Variable,
         U             = fem_function(smooth_design)
         stress        = stress_function(U)
         objective     = objective_function(weight, stress)
+
+        if penalty:
+            objective = objective + penalty_function(sgm_design)
 
         max_stress = tf.reduce_max(stress)
 
@@ -39,6 +45,7 @@ def main(problem_size: int,
          max_constraint: float,
          mode: str,
          smoothing_mode: str = "none",
+         penalty_mode: str = "none",
          thickness: float = 0.02,
          poisson_ratio: float = 0.3,
          initial_value_design: float = 2.0,
@@ -46,6 +53,7 @@ def main(problem_size: int,
          barrier_size: float = 100,
          barrier_width: float = 100,
          epochs: int = 100,
+         penalty_epochs: int = 30,
          learning_rate: float=0.1,
          data_directory: str="../data",
          **kwargs):
@@ -83,6 +91,18 @@ def main(problem_size: int,
     element_index_matrix = get_element_index_matrix(problem_size=problem_size)
     smoothing_function = smoothing_modes[smoothing_mode](element_index_matrix, **kwargs).get_smoothing_function()
 
+    penalty_modes = {
+        "none": NoPenalty,
+        "entropy": EntropyPenalty
+    }
+
+    if penalty_mode not in penalty_modes:
+        if smoothing_mode not in smoothing_modes:
+            print(f"Penalty mode must be one of ({' | '.join(penalty_modes.keys())})")
+            sys.exit(0)
+
+    penalty_function = penalty_modes[penalty_mode](**kwargs).get_penalty_function()
+
     fem_function = FEM(
         node_index_vector=node_index_vector,
         F=F,
@@ -102,6 +122,10 @@ def main(problem_size: int,
     opt_timestamp = time.time()
     constraints, weights, designs, all_constraints = [], [], [design_variables.numpy()], []
     for e in range(epochs):
+        if epochs - e < penalty_epochs: penalty = True
+        else: penalty = False
+
+
         timestamp = time.time()
         objective, weight, constraint, all_constraint = train_op(
             design_variables,
@@ -109,7 +133,9 @@ def main(problem_size: int,
             fem_function=fem_function,
             stress_function=stress_function,
             objective_function=objective_function,
+            penalty_function=penalty_function,
             optimizer=optimizer,
+            penalty=penalty
         )
 
         all_constraints.append(all_constraint)
@@ -127,52 +153,3 @@ def main(problem_size: int,
     np.save(f"{data_directory}/constraints", constraints)
     np.save(f"{data_directory}/weights", weights)
     np.save(f"{data_directory}/design", designs)
-
-
-def _von_mises():
-    problem_size = 5
-    main(
-        problem_size=problem_size,
-        elements=np.array([
-            16 * np.square(problem_size) - problem_size * 2
-        ]),
-        directions=np.array([
-            1
-        ]),
-        amplitudes=np.array([
-            -1
-        ]),
-        max_constraint=3000,
-        mode="von mises",
-        smoothing_mode="gaussian",
-        smoothing_width=5,
-        variance=3.0,
-        barrier_size=100,
-        barrier_width=300
-    )
-
-
-def _circle():
-    problem_size = 8
-    main(
-        problem_size=problem_size,
-        elements=np.array([
-            16 * np.square(problem_size) - problem_size * 2
-        ]),
-        directions=np.array([
-            1
-        ]),
-        amplitudes=np.array([
-            -1
-        ]),
-        max_constraint=3000,
-        mode="circle",
-        barrier_size=100,
-        barrier_width=200,
-        phis=[0.0],
-        kf=0.3
-    )
-
-
-if __name__ == "__main__":
-    _von_mises()
