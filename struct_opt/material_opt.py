@@ -35,7 +35,7 @@ def train_op(design: tf.Variable,
     gradients = tape.gradient(objective, design)
     optimizer.apply_gradients([(gradients, design)])
 
-    return objective, weight, max_stress, stress
+    return objective, smooth_design, weight, max_stress, stress
 
 
 def main(problem_size: int,
@@ -127,7 +127,7 @@ def main(problem_size: int,
 
 
         timestamp = time.time()
-        objective, weight, constraint, all_constraint = train_op(
+        objective, smooth_design, weight, constraint, all_constraint = train_op(
             design_variables,
             smoothing_function=smoothing_function,
             fem_function=fem_function,
@@ -141,7 +141,7 @@ def main(problem_size: int,
         all_constraints.append(all_constraint)
         constraints.append(constraint)
         weights.append(weight)
-        designs.append(tf.sigmoid(design_variables).numpy())
+        designs.append(smooth_design)
 
         print(f"{e}: O: {objective} W: {weight} C {constraint} -- T: {time.time() - timestamp}")
     print(f"Time to run optimization {epochs} epochs: {time.time() - opt_timestamp} seconds")

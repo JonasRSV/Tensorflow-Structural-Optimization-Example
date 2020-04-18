@@ -3,7 +3,7 @@ import numpy as np
 
 
 def _von_mises():
-    problem_size = 3
+    problem_size = 5
     material_opt.main(
         problem_size=problem_size,
         elements=np.array([
@@ -15,30 +15,30 @@ def _von_mises():
         amplitudes=np.array([
             -1
         ]),
-        max_constraint=10000,
+        max_constraint=3000,
 
         mode="von mises",
 
         smoothing_mode="gaussian",  # gaussian or none
         smoothing_width=3.0,
-        variance=0.5,
+        variance=1.0,
 
         penalty_mode="entropy",  # entropy or none
-        penalty_epochs=40,  # Last x epochs uses penalty
-        penalty_size=2.0,
+        penalty_epochs=50,  # Last x epochs uses penalty
+        penalty_size=10.0,
 
         thickness=0.02,
         poisson_ratio=0.3,
         initial_value_design=2.0,
         elasticity_module=1000,
 
-        barrier_size=200,
+        barrier_size=1000,
         barrier_width=4000,
 
         epochs=100,
         learning_rate=0.15,
 
-        data_directory="data"
+        data_directory="../data"
     )
 
 
