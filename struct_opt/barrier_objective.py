@@ -13,7 +13,7 @@ class Barrier():
         def objective_function(weight: tf.Tensor, constraints: tf.Tensor):
             probabilities = tf.nn.softmax(constraints - tf.reduce_min(constraints))
 
-            barrier = tf.math.log((self.max_constraint - constraints) / self.barrier_size)
+            barrier = tf.math.log((self.max_constraint - constraints) / self.barrier_width)
             barrier = barrier * probabilities * self.barrier_size
 
             return weight - tf.reduce_sum(barrier)
