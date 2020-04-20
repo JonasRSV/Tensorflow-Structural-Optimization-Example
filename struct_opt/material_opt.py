@@ -27,7 +27,7 @@ def train_op(design: tf.Variable,
         U = fem_function(smooth_design)
         stress = stress_function(U)
         objective = objective_function(weight, stress)
-        objective = objective + penalty_function(smooth_design)
+        objective = objective + penalty_function(sgm_design)
 
         max_stress = tf.reduce_max(stress)
 
