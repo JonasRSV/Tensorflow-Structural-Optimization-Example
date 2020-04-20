@@ -71,8 +71,6 @@ class Circle:
         self.stress_norm = None
 
     def get_stress_function(self):
-
-        @tf.function
         def stress_function(u: tf.Tensor):
             n_forces = tf.shape(u)[1]
             n_design = self.node_index_matrix.shape[0]
