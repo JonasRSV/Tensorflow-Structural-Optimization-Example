@@ -7,7 +7,7 @@ from struct_opt.circle import Circle
 from struct_opt.fem import FEM
 from struct_opt.barrier_objective import Barrier
 from struct_opt.smoothing import NoSmoothing, GaussianSmoothing
-from struct_opt.penalty import NoPenalty, EntropyPenalty, LinearEntropyPenalty
+from struct_opt.penalty import NoPenalty, EntropyPenalty, LinearEntropyPenalty, EntropyStructurePenalty
 import sys
 
 
@@ -23,11 +23,11 @@ def train_op(design: tf.Variable,
     with tf.GradientTape() as tape:
         sgm_design = tf.sigmoid(design)
         smooth_design = smoothing_function(sgm_design)
-        weight = tf.reduce_sum(smooth_design) / weigth_norm
+        weight = tf.reduce_sum(design) / weigth_norm
         U = fem_function(smooth_design)
         stress = stress_function(U)
         objective = objective_function(weight, stress)
-        objective = objective + penalty_function(sgm_design)
+        objective = objective + penalty_function(smooth_design)
 
         max_stress = tf.reduce_max(stress)
 
@@ -102,7 +102,8 @@ def main(problem_size: int,
     penalty_modes = {
         "none": NoPenalty,
         "entropy": EntropyPenalty,
-        "linear entropy": LinearEntropyPenalty
+        "linear entropy": LinearEntropyPenalty,
+        "entropy structure": EntropyStructurePenalty
     }
 
     if penalty_mode not in penalty_modes:
@@ -110,7 +111,9 @@ def main(problem_size: int,
             print(f"Penalty mode must be one of ({' | '.join(penalty_modes.keys())})")
             sys.exit(0)
 
-    penalty_function = penalty_modes[penalty_mode](**kwargs).get_penalty_function()
+    penalty_function = penalty_modes[penalty_mode](**kwargs,
+                                                   element_index_matrix=element_index_matrix
+                                                   ).get_penalty_function()
 
     fem_function = FEM(
         node_index_vector=node_index_vector,
