@@ -10,6 +10,8 @@ class NoPenalty:
         def penalty_function(sgm_design: tf.Tensor):
             return self.no_penalty
 
+        return penalty_function
+
 
 class EntropyPenalty:
 
