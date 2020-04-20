@@ -3,7 +3,7 @@ import tensorflow as tf
 
 class NoPenalty:
     def __init__(self, **kwargs):
-        self.no_penalty = tf.constant(0.0, dtype=tf.float64)
+        self.no_penalty = tf.constant(0.0, dtype=tf.float32)
 
     def get_penalty_function(self):
         @tf.function
