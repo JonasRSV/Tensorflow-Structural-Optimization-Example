@@ -22,6 +22,7 @@ class GaussianSmoothing:
         self.element_index_matrix = element_index_matrix
         self.variance = variance
 
+
         n_elements = element_index_matrix.max()
         smoothing_matrix = np.zeros((n_elements + 1, n_elements + 1))
 

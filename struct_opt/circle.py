@@ -68,6 +68,7 @@ class Circle:
         self.stretch_freedom = tf.constant(stretch_freedom, dtype=tf.float32)
         self.phis = tf.constant(phis, dtype=tf.float32)
         self.kf = tf.constant(kf, dtype=tf.float32)
+        self.stress_norm = None
 
     def get_stress_function(self):
 
@@ -84,6 +85,8 @@ class Circle:
 
             stress = get_stress(stress_vector, self.phis, self.kf)
 
-            return stress
+            if self.stress_norm is None: self.stress_norm = tf.reduce_max(stress)
+
+            return stress / self.stress_norm
 
         return stress_function

@@ -7,7 +7,7 @@ from struct_opt.circle import Circle
 from struct_opt.fem import FEM
 from struct_opt.barrier_objective import Barrier
 from struct_opt.smoothing import NoSmoothing, GaussianSmoothing
-from struct_opt.penalty import NoPenalty, EntropyPenalty
+from struct_opt.penalty import NoPenalty, EntropyPenalty, LinearEntropyPenalty
 import sys
 
 
@@ -17,18 +17,17 @@ def train_op(design: tf.Variable,
              stress_function: tf.function,
              objective_function: tf.function,
              penalty_function: tf.function,
-             optimizer: tf.keras.optimizers.Optimizer,
-             penalty: bool):
-    with tf.GradientTape() as tape:
-        sgm_design    = tf.sigmoid(design)
-        smooth_design = smoothing_function(sgm_design)
-        weight        = tf.reduce_sum(smooth_design)
-        U             = fem_function(smooth_design)
-        stress        = stress_function(U)
-        objective     = objective_function(weight, stress)
+             optimizer: tf.keras.optimizers.Optimizer):
+    weigth_norm: float = tf.constant(design.shape[0], dtype=tf.float32)
 
-        if penalty:
-            objective = objective + penalty_function(smooth_design)
+    with tf.GradientTape() as tape:
+        sgm_design = tf.sigmoid(design)
+        smooth_design = smoothing_function(sgm_design)
+        weight = tf.reduce_sum(smooth_design) / weigth_norm
+        U = fem_function(smooth_design)
+        stress = stress_function(U)
+        objective = objective_function(weight, stress)
+        objective = objective + penalty_function(sgm_design)
 
         max_stress = tf.reduce_max(stress)
 
@@ -36,6 +35,14 @@ def train_op(design: tf.Variable,
     optimizer.apply_gradients([(gradients, design)])
 
     return objective, smooth_design, weight, max_stress, stress
+
+
+def __check_kwarg(name: str, kwargs):
+    if name in kwargs:
+        return kwargs[name]
+    else:
+        print(f"Please provide named argument {name} to main")
+        sys.exit(0)
 
 
 def main(problem_size: int,
@@ -52,11 +59,12 @@ def main(problem_size: int,
          elasticity_module: float = 1000,
          barrier_size: float = 100,
          barrier_width: float = 100,
-         epochs: int = 100,
-         penalty_epochs: int = 30,
-         learning_rate: float=0.1,
-         data_directory: str="../data",
+         learning_rate: float = 0.1,
+         data_directory: str = "../data",
          **kwargs):
+
+    epochs = __check_kwarg("epochs", kwargs)
+
     design_variables, smoothing_matrix, node_index_matrix, node_index_vector, \
     F, stretch_freedom, element_stiffness, freedom_indexes, k_dim = \
         initialize_env(problem_size=problem_size,
@@ -93,7 +101,8 @@ def main(problem_size: int,
 
     penalty_modes = {
         "none": NoPenalty,
-        "entropy": EntropyPenalty
+        "entropy": EntropyPenalty,
+        "linear entropy": LinearEntropyPenalty
     }
 
     if penalty_mode not in penalty_modes:
@@ -122,10 +131,6 @@ def main(problem_size: int,
     opt_timestamp = time.time()
     constraints, weights, designs, all_constraints = [], [], [design_variables.numpy()], []
     for e in range(epochs):
-        if epochs - e < penalty_epochs: penalty = True
-        else: penalty = False
-
-
         timestamp = time.time()
         objective, smooth_design, weight, constraint, all_constraint = train_op(
             design_variables,
@@ -134,8 +139,7 @@ def main(problem_size: int,
             stress_function=stress_function,
             objective_function=objective_function,
             penalty_function=penalty_function,
-            optimizer=optimizer,
-            penalty=penalty
+            optimizer=optimizer
         )
 
         all_constraints.append(all_constraint.numpy())
