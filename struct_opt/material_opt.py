@@ -23,7 +23,7 @@ def train_op(design: tf.Variable,
     with tf.GradientTape() as tape:
         sgm_design = tf.sigmoid(design)
         smooth_design = smoothing_function(sgm_design)
-        weight = tf.reduce_sum(design) / weigth_norm
+        weight = tf.reduce_sum(sgm_design) / weigth_norm
         U = fem_function(smooth_design)
         stress = stress_function(U)
         objective = objective_function(weight, stress)
